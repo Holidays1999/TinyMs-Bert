@@ -17,15 +17,19 @@ import numpy as np
 
 
 from mindspore.common import dtype as mstype
-from mindspore.ops import operations as P
-from mindspore.ops import composite as C
 from mindspore.ops import functional as F
-from mindspore.common.tensor import Tensor
+
 from mindspore._checkparam import Validator as validator
 from mindspore._checkparam import Rel
-from mindspore.nn.optim.optimizer import Optimizer
 
-_adam_opt = C.MultitypeFuncGraph("adam_opt")
+import tinyms as ts
+from tinyms.optimizers import AdamWeightDecay
+from tinyms import Tensor
+from tinyms import primitives as P
+from tinyms.optimizers import Optimizer
+
+
+_adam_opt = P.MultitypeFuncGraph("adam_opt")
 _scaler_one = Tensor(1, mstype.int32)
 _scaler_ten = Tensor(10, mstype.float32)
 
@@ -36,7 +40,7 @@ def _update_run_kernel(beta1, beta2, eps, lr, weight_decay, param, m, v, gradien
     Update parameters by AdamWeightDecay op.
     """
     if optim_filter:
-        adam = P.AdamWeightDecay()
+        adam = AdamWeightDecay()
         if decay_flags:
             next_param = adam(param, m, v, lr, beta1, beta2, eps, Tensor(weight_decay, mstype.float32), gradient)
         else:
@@ -81,24 +85,24 @@ def _update_run_op(beta1, beta2, eps, lr, overflow, weight_decay, param, m, v, g
         v_fp32 = op_cast(v, mstype.float32)
         gradient_fp32 = op_cast(gradient, mstype.float32)
 
-        cond = op_cast(F.fill(mstype.int32, op_shape(m_fp32), 1) * op_reshape(overflow, (())), mstype.bool_)
+        cond = op_cast(P.Fill()(mstype.int32, op_shape(m_fp32), 1) * op_reshape(overflow, (())), mstype.bool_)
         next_m = op_mul(beta1, m_fp32) + op_select(cond, m_fp32,\
-                op_mul(op_cast(F.tuple_to_array((1.0,)), mstype.float32) - beta1, gradient_fp32))
+                op_mul(op_cast(ts.array((1.0,)), mstype.float32) - beta1, gradient_fp32))
 
         next_v = op_mul(beta2, v_fp32) + op_select(cond, v_fp32,\
-                op_mul(op_cast(F.tuple_to_array((1.0,)), mstype.float32) - beta2, op_square(gradient_fp32)))
+                op_mul(op_cast(ts.array((1.0,)), mstype.float32) - beta2, op_square(gradient_fp32)))
 
         update = next_m / (eps + op_sqrt(next_v))
         if decay_flag:
             update = op_mul(weight_decay, param_fp32) + update
 
         update_with_lr = op_mul(lr, update)
-        zeros = F.fill(mstype.float32, op_shape(param_fp32), 0)
+        zeros = P.Fill()(mstype.float32, op_shape(param_fp32), 0)
         next_param = param_fp32 - op_select(cond, zeros, op_reshape(update_with_lr, op_shape(param_fp32)))
 
-        next_param = F.depend(next_param, F.assign(param, op_cast(next_param, F.dtype(param))))
-        next_param = F.depend(next_param, F.assign(m, op_cast(next_m, F.dtype(m))))
-        next_param = F.depend(next_param, F.assign(v, op_cast(next_v, F.dtype(v))))
+        next_param = P.Depend()(next_param, P.Assign()(param, op_cast(next_param, F.dtype(param))))
+        next_param = P.Depend()(next_param, P.Assign()(m, op_cast(next_m, F.dtype(m))))
+        next_param = P.Depend()(next_param, P.Assign()(v, op_cast(next_v, F.dtype(v))))
 
         return op_cast(next_param, F.dtype(param))
     return gradient
@@ -117,12 +121,12 @@ def _run_opt_with_sparse(opt, sparse_opt, push, pull, use_locking, use_nesterov,
         shapes = (op_shape(param), op_shape(m), op_shape(v),
                   op_shape(beta1_power), op_shape(beta2_power), op_shape(lr), op_shape(beta1),
                   op_shape(beta2), op_shape(eps), op_shape(values), op_shape(indices))
-        success = F.depend(success, pull(push((beta1_power, beta2_power, lr, beta1, beta2,
+        success = P.Depend()(success, pull(push((beta1_power, beta2_power, lr, beta1, beta2,
                                                eps, values, indices), shapes), param))
         return success
 
     if not target:
-        success = F.depend(success, sparse_opt(param, m, v, beta1_power, beta2_power, lr, beta1, beta2,
+        success = P.Depend()(success, sparse_opt(param, m, v, beta1_power, beta2_power, lr, beta1, beta2,
                                                eps, values, indices))
     else:
         op_mul = P.Mul()
@@ -130,37 +134,37 @@ def _run_opt_with_sparse(opt, sparse_opt, push, pull, use_locking, use_nesterov,
         op_sqrt = P.Sqrt()
         scatter_add = P.ScatterAdd(use_locking)
 
-        success = F.depend(success, F.assign(m, op_mul(beta1, m)))
-        success = F.depend(success, F.assign(v, op_mul(beta2, v)))
+        success = P.Depend()(success, P.Assign()(m, op_mul(beta1, m)))
+        success = P.Depend()(success, P.Assign()(v, op_mul(beta2, v)))
 
         grad_indices = gradient.indices
         grad_value = gradient.values
 
         next_m = scatter_add(m,
                              grad_indices,
-                             op_mul(F.tuple_to_array((1.0,)) - beta1, grad_value))
+                             op_mul(ts.array((1.0,)) - beta1, grad_value))
 
         next_v = scatter_add(v,
                              grad_indices,
-                             op_mul(F.tuple_to_array((1.0,)) - beta2, op_square(grad_value)))
+                             op_mul(ts.array((1.0,)) - beta2, op_square(grad_value)))
 
         if use_nesterov:
             m_temp = next_m * _scaler_ten
-            F.assign(m, op_mul(beta1, next_m))
+            P.Assign()(m, op_mul(beta1, next_m))
             div_value = scatter_add(m,
                                     op_mul(grad_indices, _scaler_one),
-                                    op_mul(F.tuple_to_array((1.0,)) - beta1, grad_value))
+                                    op_mul(ts.array((1.0,)) - beta1, grad_value))
             param_update = div_value / (op_sqrt(next_v) + eps)
-            F.assign(m, m_temp / _scaler_ten)
+            P.Assign()(m, m_temp / _scaler_ten)
         else:
             param_update = next_m / (op_sqrt(next_v) + eps)
 
         lr_t = lr * op_sqrt(1 - beta2_power) / (1 - beta1_power)
         next_param = param - lr_t * param_update
 
-        success = F.depend(success, F.assign(param, next_param))
-        success = F.depend(success, F.assign(m, next_m))
-        success = F.depend(success, F.assign(v, next_v))
+        success = P.Depend()(success, P.Assign()(param, next_param))
+        success = P.Depend()(success, P.Assign()(m, next_m))
+        success = P.Depend()(success, P.Assign()(v, next_v))
 
     return success
 
@@ -174,10 +178,10 @@ def _run_opt_with_one_number(opt, sparse_opt, push, pull, use_locking, use_neste
     success = True
     if ps_parameter and not cache_enable:
         op_shape = P.Shape()
-        success = F.depend(success, pull(push((beta1_power, beta2_power, lr, beta1, beta2, eps, gradient),
+        success = P.Depend()(success, pull(push((beta1_power, beta2_power, lr, beta1, beta2, eps, gradient),
                                               (op_shape(param), op_shape(moment1), op_shape(moment2))), param))
     else:
-        success = F.depend(success, opt(param, moment1, moment2, beta1_power, beta2_power, lr, beta1, beta2,
+        success = P.Depend()(success, opt(param, moment1, moment2, beta1_power, beta2_power, lr, beta1, beta2,
                                         eps, gradient))
     return success
 
@@ -188,7 +192,7 @@ def _run_off_load_opt(opt, beta1_power, beta2_power, beta1, beta2, eps, lr, grad
     """Apply AdamOffload optimizer to the weight parameter using Tensor."""
     success = True
     delat_param = opt(moment1, moment2, beta1_power, beta2_power, lr, beta1, beta2, eps, gradient)
-    success = F.depend(success, F.assign_add(param, delat_param))
+    success = P.Depend()(success, P.Assign()(P.Add()(param, delat_param)))
     return success
 
 
@@ -271,7 +275,7 @@ class AdamWeightDecayForBert(Optimizer):
         >>> # The no_conv_params's parameters will use learning rate of 0.01 and default weight decay of 0.0.
         >>> # The final parameters order in which the optimizer will be followed is the value of 'order_params'.
         >>>
-        >>> loss = nn.SoftmaxCrossEntropyWithLogits()
+        >>> loss = layers.SoftmaxCrossEntropyWithLogits()
         >>> model = Model(net, loss_fn=loss, optimizer=optim)
    """
     def __init__(self, params, learning_rate=1e-3, beta1=0.9, beta2=0.999, eps=1e-6, weight_decay=0.0):
@@ -282,7 +286,7 @@ class AdamWeightDecayForBert(Optimizer):
         self.eps = Tensor(np.array([eps]).astype(np.float32))
         self.moments1 = self.parameters.clone(prefix="adam_m", init='zeros')
         self.moments2 = self.parameters.clone(prefix="adam_v", init='zeros')
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
         self.op_select = P.Select()
         self.op_cast = P.Cast()
         self.op_reshape = P.Reshape()
@@ -291,21 +295,21 @@ class AdamWeightDecayForBert(Optimizer):
     def construct(self, gradients, overflow):
         """AdamWeightDecayForBert"""
         lr = self.get_lr()
-        cond = self.op_cast(F.fill(mstype.int32, self.op_shape(self.beta1), 1) *\
+        cond = self.op_cast(P.Fill()(mstype.int32, self.op_shape(self.beta1), 1) *\
                             self.op_reshape(overflow, (())), mstype.bool_)
-        beta1 = self.op_select(cond, self.op_cast(F.tuple_to_array((1.0,)), mstype.float32), self.beta1)
-        beta2 = self.op_select(cond, self.op_cast(F.tuple_to_array((1.0,)), mstype.float32), self.beta2)
+        beta1 = self.op_select(cond, self.op_cast(ts.array((1.0,)), mstype.float32), self.beta1)
+        beta2 = self.op_select(cond, self.op_cast(ts.array((1.0,)), mstype.float32), self.beta2)
         if self.is_group:
             if self.is_group_lr:
-                optim_result = self.hyper_map(F.partial(_adam_opt, self.beta1, self.beta2, self.eps),
+                optim_result = self.hyper_map(P.Partial()(_adam_opt, self.beta1, self.beta2, self.eps),
                                               lr, self.weight_decay, self.parameters, self.moments1, self.moments2,
                                               gradients, self.decay_flags, self.optim_filter)
             else:
-                optim_result = self.hyper_map(F.partial(_adam_opt, beta1, beta2, self.eps, lr, overflow),
+                optim_result = self.hyper_map(P.Partial()(_adam_opt, beta1, beta2, self.eps, lr, overflow),
                                               self.weight_decay, self.parameters, self.moments1, self.moments2,
                                               gradients, self.decay_flags, self.optim_filter)
         else:
-            optim_result = self.hyper_map(F.partial(_adam_opt, self.beta1, self.beta2, self.eps, lr, self.weight_decay),
+            optim_result = self.hyper_map(P.Partial()(_adam_opt, self.beta1, self.beta2, self.eps, lr, self.weight_decay),
                                           self.parameters, self.moments1, self.moments2,
                                           gradients, self.decay_flags, self.optim_filter)
         if self.use_parallel:
@@ -381,7 +385,7 @@ class AdamWeightDecayOp(Optimizer):
         >>> # The no_conv_params's parameters will use learning rate of 0.01 and default weight decay of 0.0.
         >>> # The final parameters order in which the optimizer will be followed is the value of 'order_params'.
         >>>
-        >>> loss = nn.SoftmaxCrossEntropyWithLogits()
+        >>> loss = layers.SoftmaxCrossEntropyWithLogits()
         >>> model = Model(net, loss_fn=loss, optimizer=optim)
    """
     def __init__(self, params, learning_rate=1e-3, beta1=0.9, beta2=0.999, eps=1e-6, weight_decay=0.0):
@@ -392,22 +396,22 @@ class AdamWeightDecayOp(Optimizer):
         self.eps = Tensor(np.array([eps]).astype(np.float32))
         self.moments1 = self.parameters.clone(prefix="adam_m", init='zeros')
         self.moments2 = self.parameters.clone(prefix="adam_v", init='zeros')
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
 
     def construct(self, gradients):
         """AdamWeightDecayOp"""
         lr = self.get_lr()
         if self.is_group:
             if self.is_group_lr:
-                optim_result = self.hyper_map(F.partial(_adam_opt, self.beta1, self.beta2, self.eps),
+                optim_result = self.hyper_map(P.Partial()(_adam_opt, self.beta1, self.beta2, self.eps),
                                               lr, self.weight_decay, self.parameters, self.moments1, self.moments2,
                                               gradients, self.decay_flags, self.optim_filter)
             else:
-                optim_result = self.hyper_map(F.partial(_adam_opt, self.beta1, self.beta2, self.eps, lr),
+                optim_result = self.hyper_map(P.Partial()(_adam_opt, self.beta1, self.beta2, self.eps, lr),
                                               self.weight_decay, self.parameters, self.moments1, self.moments2,
                                               gradients, self.decay_flags, self.optim_filter)
         else:
-            optim_result = self.hyper_map(F.partial(_adam_opt, self.beta1, self.beta2, self.eps, lr, self.weight_decay),
+            optim_result = self.hyper_map(P.Partial()(_adam_opt, self.beta1, self.beta2, self.eps, lr, self.weight_decay),
                                           self.parameters, self.moments1, self.moments2,
                                           gradients, self.decay_flags, self.optim_filter)
         if self.use_parallel:
