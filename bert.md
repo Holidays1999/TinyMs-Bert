@@ -1,22 +1,16 @@
 # for run_pretrain.py
-```shell
+
+``` python
 python run_pretrain.py \
---device_target GPU \
---device_id 1 \
+--device_target {your device} \
+--device_id {your device id} \
 --enable_graph_kernel true \
---data_dir data \
---train_steps 10 \
---load_checkpoint_path \
-checkpoint_bert-1666_1.ckpt
+--data_dir {your data dir} \
+--load_checkpoint_path {yout cpkt path}
 ```
 
+#### enable_graph_kernel true
+可以图加速算子，可以提升模型的运算效率，接近3成
 
-# for 
-```python
 
-```
 
-# for 
-```python
-
-```
