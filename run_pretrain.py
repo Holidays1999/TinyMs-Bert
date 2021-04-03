@@ -22,6 +22,7 @@ import argparse
 import logging
 
 import mindspore.communication.management as D
+
 import mindspore.common.dtype as mstype
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 
