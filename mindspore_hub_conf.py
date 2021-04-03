@@ -18,6 +18,7 @@ Bert hub interface for bert base and bert nezha
 from src.bert_model import BertModel
 from src.bert_model import BertConfig
 import mindspore.common.dtype as mstype
+
 bert_net_cfg_base = BertConfig(
     seq_length=128,
     vocab_size=21128,

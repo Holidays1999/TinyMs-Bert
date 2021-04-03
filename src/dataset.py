@@ -37,7 +37,7 @@ def create_bert_dataset(device_num=1, rank=0, do_shuffle="true", data_dir=None, 
     data_set = ds.TFRecordDataset(data_files, schema_dir if schema_dir != "" else None,
                                   columns_list=["input_ids", "input_mask", "segment_ids", "next_sentence_labels",
                                                 "masked_lm_positions", "masked_lm_ids", "masked_lm_weights"],
-                                  shuffle=ds.Shuffle.FILES if do_shuffle == "true" else False,
+                                  shuffle=True if do_shuffle == "true" else False,
                                   num_shards=device_num, shard_id=rank, shard_equal_rows=True)
     ori_dataset_size = data_set.get_dataset_size()
     print('origin dataset size: ', ori_dataset_size)

@@ -17,32 +17,16 @@
 Bert for finetune script.
 '''
 
-import mindspore.nn as nn
-from mindspore.ops import operations as P
-from mindspore.ops import functional as F
-from mindspore.ops import composite as C
-from mindspore.common import dtype as mstype
 from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
 from mindspore.communication.management import get_group_size
-from mindspore import context
-
-import mindspore.nn as nn
-from mindspore.ops import functional as F
-from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
-from mindspore.communication.management import get_group_size
-
-from tinyms import context
-from .bert_model import BertModel
 import mindspore.common.dtype as mstype
 
-import tinyms as ts
-from tinyms.initializers import TruncatedNormal, initializer
+from tinyms import context
 from tinyms.context import ParallelMode
 from tinyms import layers
 from tinyms import primitives as P
 from tinyms import Tensor
 from tinyms import Parameter
-
 
 from .bert_for_pre_training import clip_grad
 from .finetune_eval_model import BertCLSModel, BertNERModel, BertSquadModel
@@ -51,19 +35,19 @@ from .utils import CrossEntropyCalculation
 
 GRADIENT_CLIP_TYPE = 1
 GRADIENT_CLIP_VALUE = 1.0
-grad_scale = C.MultitypeFuncGraph("grad_scale")
+grad_scale = P.MultitypeFuncGraph("grad_scale")
 reciprocal = P.Reciprocal()
 @grad_scale.register("Tensor", "Tensor")
 def tensor_grad_scale(scale, grad):
     return grad * reciprocal(scale)
 
-_grad_overflow = C.MultitypeFuncGraph("_grad_overflow")
+_grad_overflow = P.MultitypeFuncGraph("_grad_overflow")
 grad_overflow = P.FloatStatus()
 @_grad_overflow.register("Tensor")
 def _tensor_grad_overflow(grad):
     return grad_overflow(grad)
 
-class BertFinetuneCell(nn.Cell):
+class BertFinetuneCell(layers.Layer):
     """
     Especially defined for finetuning where only four inputs tensor are needed.
 
@@ -84,7 +68,7 @@ class BertFinetuneCell(nn.Cell):
         self.network.set_grad()
         self.weights = optimizer.parameters
         self.optimizer = optimizer
-        self.grad = C.GradOperation(get_by_list=True,
+        self.grad = P.GradOperation(get_by_list=True,
                                     sens_param=True)
         self.reducer_flag = False
         self.allreduce = P.AllReduce()
@@ -111,7 +95,7 @@ class BertFinetuneCell(nn.Cell):
         self.reduce_sum = P.ReduceSum(keep_dims=False)
         self.base = Tensor(1, mstype.float32)
         self.less_equal = P.LessEqual()
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
         self.loss_scale = None
         self.loss_scaling_manager = scale_update_cell
         if scale_update_cell:
@@ -138,26 +122,26 @@ class BertFinetuneCell(nn.Cell):
 
         if not self.gpu_target:
             init = self.alloc_status()
-            init = F.depend(init, loss)
+            init = P.Depend()(init, loss)
             clear_status = self.clear_status(init)
-            scaling_sens = F.depend(scaling_sens, clear_status)
+            scaling_sens = P.Depend()(scaling_sens, clear_status)
         grads = self.grad(self.network, weights)(input_ids,
                                                  input_mask,
                                                  token_type_id,
                                                  label_ids,
                                                  self.cast(scaling_sens,
                                                            mstype.float32))
-        grads = self.hyper_map(F.partial(grad_scale, scaling_sens), grads)
-        grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+        grads = self.hyper_map(P.Partial()(grad_scale, scaling_sens), grads)
+        grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
         if self.reducer_flag:
             grads = self.grad_reducer(grads)
         if not self.gpu_target:
-            init = F.depend(init, grads)
+            init = P.Depend()(init, grads)
             get_status = self.get_status(init)
-            init = F.depend(init, get_status)
+            init = P.Depend()(init, get_status)
             flag_sum = self.reduce_sum(init, (0,))
         else:
-            flag_sum = self.hyper_map(F.partial(_grad_overflow), grads)
+            flag_sum = self.hyper_map(P.Partial()(_grad_overflow), grads)
             flag_sum = self.addn(flag_sum)
             flag_sum = self.reshape(flag_sum, (()))
         if self.is_distributed:
@@ -173,9 +157,9 @@ class BertFinetuneCell(nn.Cell):
         else:
             succ = self.optimizer(grads)
         ret = (loss, cond)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)
 
-class BertSquadCell(nn.Cell):
+class BertSquadCell(layers.Layer):
     """
     specifically defined for finetuning where only four inputs tensor are needed.
     """
@@ -185,7 +169,7 @@ class BertSquadCell(nn.Cell):
         self.network.set_grad()
         self.weights = optimizer.parameters
         self.optimizer = optimizer
-        self.grad = C.GradOperation(get_by_list=True, sens_param=True)
+        self.grad = P.GradOperation(get_by_list=True, sens_param=True)
         self.reducer_flag = False
         self.allreduce = P.AllReduce()
         self.parallel_mode = context.get_auto_parallel_context("parallel_mode")
@@ -204,7 +188,7 @@ class BertSquadCell(nn.Cell):
         self.reduce_sum = P.ReduceSum(keep_dims=False)
         self.base = Tensor(1, mstype.float32)
         self.less_equal = P.LessEqual()
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
         self.loss_scale = None
         self.loss_scaling_manager = scale_update_cell
         if scale_update_cell:
@@ -233,9 +217,9 @@ class BertSquadCell(nn.Cell):
             scaling_sens = self.loss_scale
         else:
             scaling_sens = sens
-        init = F.depend(init, loss)
+        init = P.Depend()(init, loss)
         clear_status = self.clear_status(init)
-        scaling_sens = F.depend(scaling_sens, clear_status)
+        scaling_sens = P.Depend()(scaling_sens, clear_status)
         grads = self.grad(self.network, weights)(input_ids,
                                                  input_mask,
                                                  token_type_id,
@@ -245,13 +229,13 @@ class BertSquadCell(nn.Cell):
                                                  is_impossible,
                                                  self.cast(scaling_sens,
                                                            mstype.float32))
-        grads = self.hyper_map(F.partial(grad_scale, scaling_sens), grads)
-        grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+        grads = self.hyper_map(P.Partial()(grad_scale, scaling_sens), grads)
+        grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
         if self.reducer_flag:
             grads = self.grad_reducer(grads)
-        init = F.depend(init, grads)
+        init = P.Depend()(init, grads)
         get_status = self.get_status(init)
-        init = F.depend(init, get_status)
+        init = P.Depend()(init, get_status)
         flag_sum = self.reduce_sum(init, (0,))
         if self.is_distributed:
             flag_reduce = self.allreduce(flag_sum)
@@ -266,9 +250,9 @@ class BertSquadCell(nn.Cell):
         else:
             succ = self.optimizer(grads)
         ret = (loss, cond)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)
 
-class BertCLS(nn.Cell):
+class BertCLS(layers.Layer):
     """
     Train interface for classification finetuning task.
     """
@@ -293,7 +277,7 @@ class BertCLS(nn.Cell):
         return loss
 
 
-class BertNER(nn.Cell):
+class BertNER(layers.Layer):
     """
     Train interface for sequence labeling finetuning task.
     """
@@ -318,7 +302,7 @@ class BertNER(nn.Cell):
             loss = self.loss(logits, label_ids, self.num_labels)
         return loss
 
-class BertSquad(nn.Cell):
+class BertSquad(layers.Layer):
     '''
     Train interface for SQuAD finetuning task.
     '''

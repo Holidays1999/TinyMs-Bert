@@ -261,7 +261,7 @@ class BertNetworkWithLoss(layers.Layer):
                                masked_lm_ids, masked_lm_weights, next_sentence_labels)
         return self.cast(total_loss, mstype.float32)
 
-from tinyms.model.cycle_gan import Tr
+
 class BertTrainOneStepCell(nn.TrainOneStepCell):
     """
     Encapsulation class of bert network training.

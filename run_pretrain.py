@@ -22,16 +22,16 @@ import argparse
 import mindspore.communication.management as D
 from mindspore.communication.management import get_rank
 import mindspore.common.dtype as mstype
-from mindspore import context
-from mindspore.train.model import Model
-from mindspore.context import ParallelMode
+from tinyms import context
+from tinyms.model import Model
+from tinyms.context import ParallelMode
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-from mindspore.train.callback import ModelCheckpoint, CheckpointConfig, TimeMonitor
+from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.train_thor import ConvertModelUtils
-from mindspore.nn.optim import Lamb, Momentum, AdamWeightDecay, THOR
+from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum, THOR
 from mindspore import log as logger
-from mindspore.common import set_seed
+from tinyms import set_seed
 from src import BertNetworkWithLoss, BertTrainOneStepCell, BertTrainOneStepWithLossScaleCell, \
                 BertTrainAccumulationAllReduceEachWithLossScaleCell, \
                 BertTrainAccumulationAllReducePostWithLossScaleCell, \
