@@ -176,7 +176,7 @@ def argparse_init():
                         help="Enable shuffle for dataset, default is true.")
     parser.add_argument("--enable_data_sink", type=str, default="true", choices=["true", "false"],
                         help="Enable data sink, default is true.")
-    parser.add_argument("--data_sink_steps", type=int, default="1", help="Sink steps for each epoch, default is 1.")
+    parser.add_argument("--data_sink_steps", type=int, default="-1", help="Sink steps for each epoch, default is 1.")
     parser.add_argument("--accumulation_steps", type=int, default="1",
                         help="Accumulating gradients N times before weight update, default is 1.")
     parser.add_argument("--allreduce_post_accumulation", type=str, default="true", choices=["true", "false"],
@@ -289,7 +289,7 @@ def run_pretrain():
         net_with_grads = BertTrainOneStepCell(net_with_loss, optimizer=optimizer)
 
     model = Model(net_with_grads)
-    model.compile(loss_fn=net_with_loss, optimizer=net_opt, metrics={"Accuracy": Accuracy()})
+    model.compile(optimizer=optimizer)
 
     if args_opt.load_checkpoint_path:
         model.load_checkpoint(args_opt.load_checkpoint_path)
@@ -298,6 +298,10 @@ def run_pretrain():
     model.train(new_repeat_count, ds, callbacks=callback,
                 dataset_sink_mode=(args_opt.enable_data_sink == "true"), sink_size=args_opt.data_sink_steps)
 
+    ds_train = create_dataset(cifar10_path, batch_size=batch_size)
+    ckpoint_cb = ModelCheckpoint(prefix="resnet_cifar10", config=CheckpointConfig(
+        save_checkpoint_steps=save_checkpoint_epochs * ds_train.get_dataset_size(),
+        keep_checkpoint_max=10))
 
 if __name__ == '__main__':
     set_seed(0)
