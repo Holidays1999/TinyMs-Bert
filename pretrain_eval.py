@@ -135,7 +135,8 @@ def bert_predict():
     net_for_pretraining.set_train(False)
 
     model = Model(net_for_pretraining)
-    model.load_checkpoint(load_checkpoint_path)
+    model.load_checkpoint(cfg.finetune_ckpt)
+
     return model, dataset, net_for_pretraining
 
 
