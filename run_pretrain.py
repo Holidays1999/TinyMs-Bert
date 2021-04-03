@@ -101,18 +101,21 @@ def _get_optimizer(args_opt, network):
         group_params = [{'params': decay_params, 'weight_decay': cfg.AdamWeightDecay.weight_decay},
                         {'params': other_params, 'weight_decay': 0.0},
                         {'order_params': params}]
+
         if args_opt.enable_lossscale == "true" and args_opt.device_target == 'GPU':
             optimizer = AdamWeightDecayForBert(group_params, learning_rate=lr_schedule, eps=cfg.AdamWeightDecay.eps)
         elif context.get_context("mode") == context.PYNATIVE_MODE and args_opt.device_target == 'GPU':
             optimizer = AdamWeightDecayOp(group_params, learning_rate=lr_schedule, eps=cfg.AdamWeightDecay.eps)
         else:
             optimizer = AdamWeightDecay(group_params, learning_rate=lr_schedule, eps=cfg.AdamWeightDecay.eps)
+
     elif cfg.optimizer == "Thor":
         from src.utils import get_bert_thor_lr, get_bert_thor_damping
         lr = get_bert_thor_lr(cfg.Thor.lr_max, cfg.Thor.lr_min, cfg.Thor.lr_power, cfg.Thor.lr_total_steps)
         damping = get_bert_thor_damping(cfg.Thor.damping_max, cfg.Thor.damping_min, cfg.Thor.damping_power,
                                         cfg.Thor.damping_total_steps)
         split_indices = None
+
         if bert_net_cfg.num_hidden_layers == 12:
             if bert_net_cfg.use_relative_positions:
                 split_indices = [29, 58, 87, 116, 145, 174, 203, 217]
@@ -123,6 +126,7 @@ def _get_optimizer(args_opt, network):
                 split_indices = [30, 90, 150, 210, 270, 330, 390, 421]
             else:
                 split_indices = [38, 93, 148, 203, 258, 313, 368, 397]
+
         optimizer = THOR(network, lr, damping, cfg.Thor.momentum,
                          cfg.Thor.weight_decay, cfg.Thor.loss_scale, cfg.batch_size,
                          decay_filter=lambda x: 'layernorm' not in x.name.lower() and 'bias' not in x.name.lower(),
@@ -130,6 +134,7 @@ def _get_optimizer(args_opt, network):
     else:
         raise ValueError("Don't support optimizer {}, only support [Lamb, Momentum, AdamWeightDecay, Thor]".
                          format(cfg.optimizer))
+
     return optimizer
 
 

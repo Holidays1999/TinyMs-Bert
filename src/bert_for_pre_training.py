@@ -54,7 +54,8 @@ def _clip_grad(clip_type, clip_value, grad):
     """
     if clip_type not in (0, 1):
         return grad
-    dt = F.dtype(grad)
+    dt = P.DType()(grad)
+
     if clip_type == 0:
         new_grad = P.clip_by_value(grad, P.Cast()(ts.array((-clip_value,)), dt),
                                    P.Cast()(ts.array((clip_value,)), dt))
@@ -105,7 +106,7 @@ class GetMaskedLMOutput(layers.Layer):
                   output_weights,
                   positions):
         """Get output log_probs"""
-        rng = ts.array(F.make_range(P.Shape()(input_tensor)[0]))
+        rng = ts.array(ts.arange(P.Shape()(input_tensor)[0]))
         flat_offsets = self.reshape(rng * self.seq_length_tensor, self.shape_flat_offsets)
         flat_position = self.reshape(positions + flat_offsets, self.last_idx)
         flat_sequence_tensor = self.reshape(input_tensor, self.shape_flat_sequence_tensor)
@@ -493,14 +494,14 @@ update_accu_grads = P.MultitypeFuncGraph("update_accu_grads")
 @update_accu_grads.register("Tensor", "Tensor")
 def _update_accu_grads(accu_grad, grad):
     succ = True
-    return P.Depend()(succ, F.assign(accu_grad, cast(grad, mstype.float32)))
+    return P.Depend()(succ, P.AssignAdd()(accu_grad, cast(grad, mstype.float32)))
 
 accumulate_accu_grads = P.MultitypeFuncGraph("accumulate_accu_grads")
 
 @accumulate_accu_grads.register("Tensor", "Tensor")
 def _accumulate_accu_grads(accu_grad, grad):
     succ = True
-    return P.Depend()(succ, F.assign_add(accu_grad, cast(grad, mstype.float32)))
+    return P.Depend()(succ, P.AssignAdd()(accu_grad, cast(grad, mstype.float32)))
 
 
 zeroslike = P.ZerosLike()
@@ -510,7 +511,7 @@ reset_accu_grads = P.MultitypeFuncGraph("reset_accu_grads")
 @reset_accu_grads.register("Tensor")
 def _reset_accu_grads(accu_grad):
     succ = True
-    return P.Depend()(succ, F.assign(accu_grad, zeroslike(accu_grad)))
+    return P.Depend()(succ, P.Assign()(accu_grad, zeroslike(accu_grad)))
 
 
 class BertTrainAccumulationAllReducePostWithLossScaleCell(layers.Layer):
@@ -553,13 +554,13 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(layers.Layer):
         self.parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if self.parallel_mode in [ParallelMode.DATA_PARALLEL, ParallelMode.HYBRID_PARALLEL]:
             self.reducer_flag = True
-        self.grad_reducer = F.identity
+        self.grad_reducer = P.Identity()
         self.degree = 1
         if self.reducer_flag:
             self.degree = get_group_size()
             self.grad_reducer = DistributedGradReducer(optimizer.parameters, False, self.degree)
         self.is_distributed = (self.parallel_mode != ParallelMode.STAND_ALONE)
-        self.overflow_reducer = F.identity
+        self.overflow_reducer = P.Identity()
         if self.is_distributed:
             self.overflow_reducer = P.AllReduce()
         self.cast = P.Cast()
@@ -702,13 +703,13 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(layers.Layer):
         self.parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if self.parallel_mode in [ParallelMode.DATA_PARALLEL, ParallelMode.HYBRID_PARALLEL]:
             self.reducer_flag = True
-        self.grad_reducer = F.identity
+        self.grad_reducer = P.Identity()
         self.degree = 1
         if self.reducer_flag:
             self.degree = get_group_size()
             self.grad_reducer = DistributedGradReducer(optimizer.parameters, False, self.degree)
         self.is_distributed = (self.parallel_mode != ParallelMode.STAND_ALONE)
-        self.overflow_reducer = F.identity
+        self.overflow_reducer = P.Identity()
         if self.is_distributed:
             self.overflow_reducer = P.AllReduce()
         self.cast = P.Cast()
