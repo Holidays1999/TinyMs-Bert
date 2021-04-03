@@ -277,6 +277,7 @@ def run_pretrain():
 
     model = Model(net_with_grads)
 
+
     if args_opt.load_checkpoint_path:
         model.load_checkpoint(args_opt.load_checkpoint_path)
 
