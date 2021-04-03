@@ -14,7 +14,7 @@
 # ============================================================================
 """
 #################pre_train bert example on zh-wiki########################
-python run_pretrain.py
+                    python run_pretrain.py
 """
 
 import os
@@ -24,7 +24,8 @@ import mindspore.communication.management as D
 import mindspore.common.dtype as mstype
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 
-from mindspore import log as logger
+import logging
+
 
 from tinyms import context
 from tinyms.model import Model
@@ -193,6 +194,8 @@ def argparse_init():
 
 def run_pretrain():
     """pre-train bert_clue"""
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
     parser = argparse_init()
     args_opt = parser.parse_args()
     context.set_context(mode=context.GRAPH_MODE, device_target=args_opt.device_target, device_id=args_opt.device_id)
@@ -242,8 +245,12 @@ def run_pretrain():
         args_opt.train_steps = args_opt.epoch_size * ds.get_dataset_size() // args_opt.accumulation_steps
         logger.info("train steps: {}".format(args_opt.train_steps))
 
+    # get the optimizer followed args_opt.optimizer
     optimizer = _get_optimizer(args_opt, net_with_loss)
+
+    # define the callbacks
     callback = [TimeMonitor(args_opt.data_sink_steps), LossCallBack(ds.get_dataset_size())]
+
     if args_opt.enable_save_ckpt == "true" and args_opt.device_id % min(8, device_num) == 0:
         config_ck = CheckpointConfig(save_checkpoint_steps=args_opt.save_checkpoint_steps,
                                      keep_checkpoint_max=args_opt.save_checkpoint_num)
