@@ -194,8 +194,7 @@ def argparse_init():
 
 def run_pretrain():
     """pre-train bert_clue"""
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger(__name__)
+
     parser = argparse_init()
     args_opt = parser.parse_args()
     context.set_context(mode=context.GRAPH_MODE, device_target=args_opt.device_target, device_id=args_opt.device_id)
@@ -297,5 +296,9 @@ def run_pretrain():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+
     set_seed(0)
     run_pretrain()
