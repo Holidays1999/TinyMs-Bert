@@ -73,12 +73,11 @@ def do_train(dataset=None, network=None, load_checkpoint_path="", save_checkpoin
     ckpoint_cb = ModelCheckpoint(prefix="squad",
                                  directory=None if save_checkpoint_path == "" else save_checkpoint_path,
                                  config=ckpt_config)
-    param_dict = load_checkpoint(load_checkpoint_path)
-    load_param_into_net(network, param_dict)
 
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=2**32, scale_factor=2, scale_window=1000)
     netwithgrads = BertSquadCell(network, optimizer=optimizer, scale_update_cell=update_cell)
     model = Model(netwithgrads)
+    model.load_checkpoint(load_checkpoint_path)
     callbacks = [TimeMonitor(dataset.get_dataset_size()), LossCallBack(dataset.get_dataset_size()), ckpoint_cb]
     model.train(epoch_num, dataset, callbacks=callbacks)
 

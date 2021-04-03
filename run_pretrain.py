@@ -278,10 +278,9 @@ def run_pretrain():
     model = Model(net_with_grads)
 
     if args_opt.load_checkpoint_path:
-        # param_dict = load_checkpoint(args_opt.load_checkpoint_path)
-        # load_param_into_net(net_with_loss, param_dict)
-        model.load_checkpoint(args_opt.checkpoint_path)
-        print('load weights successful')
+        model.load_checkpoint(args_opt.load_checkpoint_path)
+
+
     model = ConvertModelUtils().convert_to_thor_model(model, network=net_with_grads, optimizer=optimizer,
                                                       frequency=cfg.Thor.frequency)
     model.train(new_repeat_count, ds, callbacks=callback,

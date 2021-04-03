@@ -134,9 +134,10 @@ def bert_predict():
     dataset = get_enwiki_512_dataset(cfg.batch_size, 1)
     net_for_pretraining = BertPretrainEva(bert_net_cfg)
     net_for_pretraining.set_train(False)
-    param_dict = load_checkpoint(cfg.finetune_ckpt)
-    load_param_into_net(net_for_pretraining, param_dict)
+    # param_dict = load_checkpoint(cfg.finetune_ckpt)
+    # load_param_into_net(net_for_pretraining, param_dict)
     model = Model(net_for_pretraining)
+    model.load_checkpoint(load_checkpoint_path)
     return model, dataset, net_for_pretraining
 
 
