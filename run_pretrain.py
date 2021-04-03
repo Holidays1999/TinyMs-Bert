@@ -205,6 +205,7 @@ def run_pretrain():
     is_auto_enable_graph_kernel = _auto_enable_graph_kernel(args_opt.device_target, args_opt.enable_graph_kernel)
     _set_graph_kernel_context(args_opt.device_target, args_opt.enable_graph_kernel, is_auto_enable_graph_kernel)
     ckpt_save_dir = args_opt.save_checkpoint_path
+
     if args_opt.distribute == "true":
         if args_opt.device_target == 'Ascend':
             D.init()
