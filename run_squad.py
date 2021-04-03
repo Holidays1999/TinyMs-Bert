@@ -25,13 +25,13 @@ from src.dataset import create_squad_dataset
 from src.utils import make_directory, LossCallBack, LoadNewestCkpt, BertLearningRate
 
 import mindspore.common.dtype as mstype
-from mindspore import context
 from tinyms import context
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-from mindspore.nn.optim import AdamWeightDecay, Lamb, Momentum
-from mindspore.common.tensor import Tensor
-from mindspore.train.model import Model
-from mindspore.train.callback import CheckpointConfig, ModelCheckpoint, TimeMonitor
+from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum
+from tinyms import Tensor
+from tinyms.model import Model
+from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
+
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 
 _cur_dir = os.getcwd()

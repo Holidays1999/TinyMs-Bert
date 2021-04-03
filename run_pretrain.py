@@ -252,6 +252,7 @@ def run_pretrain():
         param_dict = load_checkpoint(args_opt.load_checkpoint_path)
         load_param_into_net(net_with_loss, param_dict)
 
+
     if args_opt.enable_lossscale == "true":
         update_cell = DynamicLossScaleUpdateCell(loss_scale_value=cfg.loss_scale_value,
                                                  scale_factor=cfg.scale_factor,
@@ -277,6 +278,8 @@ def run_pretrain():
         net_with_grads = BertTrainOneStepCell(net_with_loss, optimizer=optimizer)
 
     model = Model(net_with_grads)
+
+
     model = ConvertModelUtils().convert_to_thor_model(model, network=net_with_grads, optimizer=optimizer,
                                                       frequency=cfg.Thor.frequency)
     model.train(new_repeat_count, ds, callbacks=callback,
