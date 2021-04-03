@@ -17,7 +17,7 @@ import argparse
 import numpy as np
 
 import mindspore.common.dtype as mstype
-from mindspore import load_checkpoint, export
+from tinyms.model import Model
 from tinyms import Tensor, context
 
 from src.finetune_eval_model import BertCLSModel, BertSquadModel, BertNERModel
@@ -72,8 +72,10 @@ if __name__ == "__main__":
     else:
         raise ValueError("unsupported downstream task")
 
-    load_checkpoint(args.ckpt_file, net=net)
-    net.set_train(False)
+    # load_checkpoint(args.ckpt_file, net=net)
+    # net.set_train(False)
+    model = Model(net)
+    model.load_checkpoint(args.ckpt_file)
 
     input_ids = Tensor(np.zeros([args.batch_size, bert_net_cfg.seq_length]), mstype.int32)
     input_mask = Tensor(np.zeros([args.batch_size, bert_net_cfg.seq_length]), mstype.int32)
@@ -84,4 +86,5 @@ if __name__ == "__main__":
         input_data = [input_ids, input_mask, token_type_id, label_ids]
     else:
         input_data = [input_ids, input_mask, token_type_id]
-    export(net, *input_data, file_name=args.file_name, file_format=args.file_format)
+    model.export(*input_data, file_name=args.file_name, file_format=args.file_format)
+    # export(net, *input_data, file_name=args.file_name, file_format=args.file_format)
