@@ -27,7 +27,6 @@ from tinyms.model import Model
 from tinyms.context import ParallelMode
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.train_thor import ConvertModelUtils
 from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum, THOR
 from mindspore import log as logger

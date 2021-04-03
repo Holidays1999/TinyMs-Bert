@@ -73,8 +73,8 @@ def do_train(dataset=None, network=None, load_checkpoint_path="", save_checkpoin
     ckpoint_cb = ModelCheckpoint(prefix="ner",
                                  directory=None if save_checkpoint_path == "" else save_checkpoint_path,
                                  config=ckpt_config)
-    # param_dict = load_checkpoint(load_checkpoint_path)
-    # load_param_into_net(network, param_dict)
+
+
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=2**32, scale_factor=2, scale_window=1000)
     netwithgrads = BertFinetuneCell(network, optimizer=optimizer, scale_update_cell=update_cell)
     model = Model(netwithgrads)
@@ -111,9 +111,8 @@ def do_eval(dataset=None, network=None, use_crf="", num_class=41, assessment_met
     net_for_pretraining = network(bert_net_cfg, batch_size, False, num_class,
                                   use_crf=(use_crf.lower() == "true"), tag_to_index=tag_to_index)
     net_for_pretraining.set_train(False)
-    param_dict = load_checkpoint(load_checkpoint_path)
-    load_param_into_net(net_for_pretraining, param_dict)
     model = Model(net_for_pretraining)
+    model.load_checkpoint(load_checkpoint_path)
 
     if assessment_method == "clue_benchmark":
         from src.cluener_evaluation import submit

@@ -31,7 +31,6 @@ from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.optim import AdamWeightDecay, Lamb, Momentum
 from mindspore.train.model import Model
 from mindspore.train.callback import CheckpointConfig, ModelCheckpoint, TimeMonitor
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
 
 _cur_dir = os.getcwd()
 
@@ -72,8 +71,7 @@ def do_train(dataset=None, network=None, load_checkpoint_path="", save_checkpoin
     ckpoint_cb = ModelCheckpoint(prefix="classifier",
                                  directory=None if save_checkpoint_path == "" else save_checkpoint_path,
                                  config=ckpt_config)
-    # param_dict = load_checkpoint(load_checkpoint_path)
-    # load_param_into_net(network, param_dict)
+
 
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=2**32, scale_factor=2, scale_window=1000)
     netwithgrads = BertFinetuneCell(network, optimizer=optimizer, scale_update_cell=update_cell)
@@ -104,9 +102,9 @@ def do_eval(dataset=None, network=None, num_class=2, assessment_method="accuracy
         raise ValueError("Finetune model missed, evaluation task must load finetune model!")
     net_for_pretraining = network(bert_net_cfg, False, num_class)
     net_for_pretraining.set_train(False)
-    param_dict = load_checkpoint(load_checkpoint_path)
-    load_param_into_net(net_for_pretraining, param_dict)
+
     model = Model(net_for_pretraining)
+    model.load_checkpoint(load_checkpoint_path)
 
     if assessment_method == "accuracy":
         callback = Accuracy()

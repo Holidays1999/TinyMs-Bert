@@ -26,7 +26,6 @@ from tinyms import data
 from tinyms import vision
 from tinyms import layers
 from tinyms.model import Model
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from tinyms.metrics import Metric
 from tinyms import Parameter
 from tinyms import primitives as P
@@ -134,8 +133,7 @@ def bert_predict():
     dataset = get_enwiki_512_dataset(cfg.batch_size, 1)
     net_for_pretraining = BertPretrainEva(bert_net_cfg)
     net_for_pretraining.set_train(False)
-    # param_dict = load_checkpoint(cfg.finetune_ckpt)
-    # load_param_into_net(net_for_pretraining, param_dict)
+
     model = Model(net_for_pretraining)
     model.load_checkpoint(load_checkpoint_path)
     return model, dataset, net_for_pretraining

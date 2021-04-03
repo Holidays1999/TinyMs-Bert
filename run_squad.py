@@ -32,7 +32,6 @@ from tinyms import Tensor
 from tinyms.model import Model
 from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
 
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
 
 _cur_dir = os.getcwd()
 
@@ -88,9 +87,9 @@ def do_eval(dataset=None, load_checkpoint_path="", eval_batch_size=1):
         raise ValueError("Finetune model missed, evaluation task must load finetune model!")
     net = BertSquad(bert_net_cfg, False, 2)
     net.set_train(False)
-    param_dict = load_checkpoint(load_checkpoint_path)
-    load_param_into_net(net, param_dict)
+
     model = Model(net)
+    model.load_checkpoint(load_checkpoint_path)
     output = []
     RawResult = collections.namedtuple("RawResult", ["unique_id", "start_logits", "end_logits"])
     columns_list = ["input_ids", "input_mask", "segment_ids", "unique_ids"]
