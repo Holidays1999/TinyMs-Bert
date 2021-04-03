@@ -130,7 +130,7 @@ def bert_predict():
     Predict function
     '''
     devid = int(os.getenv('DEVICE_ID'))
-    context.set_context(mode=context.GRAPH_MODE, device_target="Ascend", device_id=devid)
+    context.set_context(mode=context.GRAPH_MODE, device_target="GPU", device_id=devid)
     dataset = get_enwiki_512_dataset(cfg.batch_size, 1)
     net_for_pretraining = BertPretrainEva(bert_net_cfg)
     net_for_pretraining.set_train(False)
