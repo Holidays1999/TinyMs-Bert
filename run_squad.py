@@ -24,9 +24,10 @@ from src.finetune_eval_config import optimizer_cfg, bert_net_cfg
 from src.dataset import create_squad_dataset
 from src.utils import make_directory, LossCallBack, LoadNewestCkpt, BertLearningRate
 
+from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 import mindspore.common.dtype as mstype
 from tinyms import context
-from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
+
 from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum
 from tinyms import Tensor
 from tinyms.model import Model
