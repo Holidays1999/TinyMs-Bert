@@ -19,12 +19,11 @@
 
 import os
 import argparse
+import logging
 
 import mindspore.communication.management as D
 import mindspore.common.dtype as mstype
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-
-import logging
 
 
 from tinyms import context
@@ -285,7 +284,7 @@ def run_pretrain():
         net_with_grads = BertTrainOneStepCell(net_with_loss, optimizer=optimizer)
 
     model = Model(net_with_grads)
-
+    model.compile(loss_fn=net_with_loss, optimizer=net_opt, metrics={"Accuracy": Accuracy()})
 
     if args_opt.load_checkpoint_path:
         model.load_checkpoint(args_opt.load_checkpoint_path)
@@ -297,7 +296,10 @@ def run_pretrain():
 
 if __name__ == '__main__':
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     logger = logging.getLogger(__name__)
 
     set_seed(0)
