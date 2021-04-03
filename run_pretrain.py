@@ -298,11 +298,6 @@ def run_pretrain():
     model.train(new_repeat_count, ds, callbacks=callback,
                 dataset_sink_mode=(args_opt.enable_data_sink == "true"), sink_size=args_opt.data_sink_steps)
 
-    ds_train = create_dataset(cifar10_path, batch_size=batch_size)
-    ckpoint_cb = ModelCheckpoint(prefix="resnet_cifar10", config=CheckpointConfig(
-        save_checkpoint_steps=save_checkpoint_epochs * ds_train.get_dataset_size(),
-        keep_checkpoint_max=10))
-
 if __name__ == '__main__':
     set_seed(0)
     run_pretrain()
