@@ -1,3 +1,6 @@
+#### 由于代码太多，放进去可能弄乱tinyms的接口，就没有放到tinyms里面了
+
+
 #### 代码来源
 https://gitee.com/mindspore/mindspore/tree/master/model_zoo/official/nlp/bert
 其中能在TinyMs中找到的可以替换的api都已经替换，部分核心功能TinyMs暂时还没有，只能使用mindspore的了
