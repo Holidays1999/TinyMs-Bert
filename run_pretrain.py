@@ -248,9 +248,7 @@ def run_pretrain():
                                      directory=None if ckpt_save_dir == "" else ckpt_save_dir, config=config_ck)
         callback.append(ckpoint_cb)
 
-    if args_opt.load_checkpoint_path:
-        param_dict = load_checkpoint(args_opt.load_checkpoint_path)
-        load_param_into_net(net_with_loss, param_dict)
+
 
 
     if args_opt.enable_lossscale == "true":
@@ -279,7 +277,11 @@ def run_pretrain():
 
     model = Model(net_with_grads)
 
-
+    if args_opt.load_checkpoint_path:
+        # param_dict = load_checkpoint(args_opt.load_checkpoint_path)
+        # load_param_into_net(net_with_loss, param_dict)
+        model.load_checkpoint(args_opt.checkpoint_path)
+        print('load weights successful')
     model = ConvertModelUtils().convert_to_thor_model(model, network=net_with_grads, optimizer=optimizer,
                                                       frequency=cfg.Thor.frequency)
     model.train(new_repeat_count, ds, callbacks=callback,
