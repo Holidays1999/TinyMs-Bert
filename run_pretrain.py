@@ -19,18 +19,21 @@ python run_pretrain.py
 
 import os
 import argparse
+
 import mindspore.communication.management as D
 from mindspore.communication.management import get_rank
 import mindspore.common.dtype as mstype
+from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
+from mindspore.train.train_thor import ConvertModelUtils
+from mindspore import log as logger
+
 from tinyms import context
 from tinyms.model import Model
 from tinyms.context import ParallelMode
-from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
-from mindspore.train.train_thor import ConvertModelUtils
 from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum, THOR
-from mindspore import log as logger
 from tinyms import set_seed
+
 from src import BertNetworkWithLoss, BertTrainOneStepCell, BertTrainOneStepWithLossScaleCell, \
                 BertTrainAccumulationAllReduceEachWithLossScaleCell, \
                 BertTrainAccumulationAllReducePostWithLossScaleCell, \
