@@ -42,6 +42,7 @@ from src import BertNetworkWithLoss, BertTrainOneStepCell, BertTrainOneStepWithL
 from src.dataset import create_bert_dataset
 from src.config import cfg, bert_net_cfg
 from src.utils import LossCallBack, BertLearningRate
+
 _current_dir = os.path.dirname(os.path.realpath(__file__))
 
 

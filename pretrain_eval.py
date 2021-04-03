@@ -20,7 +20,9 @@ Bert evaluation script.
 import os
 from src import BertModel, GetMaskedLMOutput
 from src.config import cfg, bert_net_cfg
+
 import mindspore.common.dtype as mstype
+
 from tinyms import context, Tensor
 from tinyms import data
 from tinyms import vision
