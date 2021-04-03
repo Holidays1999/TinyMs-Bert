@@ -26,8 +26,9 @@ from src.utils import make_directory, LossCallBack, LoadNewestCkpt, BertLearning
 
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 import mindspore.common.dtype as mstype
-from tinyms import context
+from mindspore import log as logger
 
+from tinyms import context
 from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum
 from tinyms import Tensor
 from tinyms.model import Model
