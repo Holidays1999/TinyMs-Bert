@@ -21,10 +21,9 @@ import os
 import argparse
 
 import mindspore.communication.management as D
-from mindspore.communication.management import get_rank
 import mindspore.common.dtype as mstype
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-from mindspore.train.train_thor import ConvertModelUtils
+
 from mindspore import log as logger
 
 from tinyms import context
@@ -39,6 +38,7 @@ from src import BertNetworkWithLoss, BertTrainOneStepCell, BertTrainOneStepWithL
                 BertTrainAccumulationAllReducePostWithLossScaleCell, \
                 BertTrainOneStepWithLossScaleCellForAdam, \
                 AdamWeightDecayForBert, AdamWeightDecayOp
+
 from src.dataset import create_bert_dataset
 from src.config import cfg, bert_net_cfg
 from src.utils import LossCallBack, BertLearningRate
@@ -209,7 +209,7 @@ def run_pretrain():
             D.init()
             device_num = D.get_group_size()
             rank = D.get_rank()
-        ckpt_save_dir = args_opt.save_checkpoint_path + 'ckpt_' + str(get_rank()) + '/'
+        ckpt_save_dir = args_opt.save_checkpoint_path + 'ckpt_' + str(D.get_rank()) + '/'
 
         context.reset_auto_parallel_context()
         context.set_auto_parallel_context(parallel_mode=ParallelMode.DATA_PARALLEL, gradients_mean=True,
@@ -285,8 +285,6 @@ def run_pretrain():
         model.load_checkpoint(args_opt.load_checkpoint_path)
 
 
-    model = ConvertModelUtils().convert_to_thor_model(model, network=net_with_grads, optimizer=optimizer,
-                                                      frequency=cfg.Thor.frequency)
     model.train(new_repeat_count, ds, callbacks=callback,
                 dataset_sink_mode=(args_opt.enable_data_sink == "true"), sink_size=args_opt.data_sink_steps)
 
