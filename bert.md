@@ -34,7 +34,8 @@ python create_pretraining_data.py \
 --output_file result.tfrecord \
 --input_file ../wikidata/result/AA/wiki_00
 ```
-进行分词预处理，最后生成result.tfrecord
+进行预处理，最后生成result.tfrecord
+如果要对所有的wiki都进行词向量处理可能要很久，因此就处理了一个
 
 
 #### 生成预处理数据
