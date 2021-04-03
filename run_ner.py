@@ -25,14 +25,16 @@ from src.finetune_eval_config import optimizer_cfg, bert_net_cfg
 from src.dataset import create_ner_dataset
 from src.utils import make_directory, LossCallBack, LoadNewestCkpt, BertLearningRate, convert_labels_to_index
 from src.assessment_method import Accuracy, F1, MCC, Spearman_Correlation
+
 import mindspore.common.dtype as mstype
-from mindspore import context
 from mindspore import log as logger
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-from mindspore.nn.optim import AdamWeightDecay, Lamb, Momentum
-from mindspore.train.model import Model
-from mindspore.train.callback import CheckpointConfig, ModelCheckpoint, TimeMonitor
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
+
+from tinyms import context
+from tinyms.model import Model
+from tinyms.callbacks import ModelCheckpoint, CheckpointConfig, TimeMonitor
+from tinyms.optimizers import AdamWeightDecay, Lamb, Momentum
+
 
 _cur_dir = os.getcwd()
 
