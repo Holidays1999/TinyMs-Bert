@@ -293,7 +293,6 @@ def run_pretrain():
     if args_opt.load_checkpoint_path:
         model.load_checkpoint(args_opt.load_checkpoint_path)
 
-    print(new_repeat_count)
     model.train(new_repeat_count, ds, callbacks=callback,
                 dataset_sink_mode=(args_opt.enable_data_sink == "true"), sink_size=args_opt.data_sink_steps)
 
