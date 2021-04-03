@@ -44,7 +44,11 @@ from src.config import cfg, bert_net_cfg
 from src.utils import LossCallBack, BertLearningRate
 
 _current_dir = os.path.dirname(os.path.realpath(__file__))
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def _set_bert_all_reduce_split():
     """set bert all_reduce fusion split, support num_hidden_layers is 12 and 24."""
@@ -295,12 +299,5 @@ def run_pretrain():
 
 
 if __name__ == '__main__':
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger(__name__)
-
     set_seed(0)
     run_pretrain()
