@@ -21,16 +21,16 @@ import os
 from src import BertModel, GetMaskedLMOutput
 from src.config import cfg, bert_net_cfg
 import mindspore.common.dtype as mstype
-from mindspore import context
-from mindspore.common.tensor import Tensor
-import mindspore.dataset as de
-import mindspore.dataset.transforms.c_transforms as C
-from mindspore.train.model import Model
+from tinyms import context, Tensor
+from tinyms import data
+from tinyms import vision
+from tinyms import layers
+from tinyms.model import Model
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-import mindspore.nn as nn
-from mindspore.nn.metrics import Metric
-from mindspore.ops import operations as P
-from mindspore.common.parameter import Parameter
+from tinyms.metrics import Metric
+from tinyms import Parameter
+from tinyms import primitives as P
+
 
 class myMetric(Metric):
     '''
@@ -54,7 +54,7 @@ class myMetric(Metric):
         return self.acc_num/self.total_num
 
 
-class GetLogProbs(nn.Cell):
+class GetLogProbs(layers.Layer):
     '''
     Get MaskedLM prediction scores
     '''
@@ -69,7 +69,7 @@ class GetLogProbs(nn.Cell):
         return prediction_scores
 
 
-class BertPretrainEva(nn.Cell):
+class BertPretrainEva(layers.Layer):
     '''
     Evaluate MaskedLM prediction scores
     '''
@@ -107,11 +107,11 @@ def get_enwiki_512_dataset(batch_size=1, repeat_count=1, distribute_file=''):
     '''
     Get enwiki dataset when seq_length is 512.
     '''
-    ds = de.TFRecordDataset([cfg.data_file], cfg.schema_file, columns_list=["input_ids", "input_mask", "segment_ids",
+    ds = data.TFRecordDataset([cfg.data_file], cfg.schema_file, columns_list=["input_ids", "input_mask", "segment_ids",
                                                                             "masked_lm_positions", "masked_lm_ids",
                                                                             "masked_lm_weights",
                                                                             "next_sentence_labels"])
-    type_cast_op = C.TypeCast(mstype.int32)
+    type_cast_op = vision.TypeCast(mstype.int32)
     ds = ds.map(operations=type_cast_op, input_columns="segment_ids")
     ds = ds.map(operations=type_cast_op, input_columns="input_mask")
     ds = ds.map(operations=type_cast_op, input_columns="input_ids")
