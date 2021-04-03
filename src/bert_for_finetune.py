@@ -21,13 +21,29 @@ import mindspore.nn as nn
 from mindspore.ops import operations as P
 from mindspore.ops import functional as F
 from mindspore.ops import composite as C
-from mindspore.common.tensor import Tensor
-from mindspore.common.parameter import Parameter
 from mindspore.common import dtype as mstype
 from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
-from mindspore.context import ParallelMode
 from mindspore.communication.management import get_group_size
 from mindspore import context
+
+import mindspore.nn as nn
+from mindspore.ops import functional as F
+from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
+from mindspore.communication.management import get_group_size
+
+from tinyms import context
+from .bert_model import BertModel
+import mindspore.common.dtype as mstype
+
+import tinyms as ts
+from tinyms.initializers import TruncatedNormal, initializer
+from tinyms.context import ParallelMode
+from tinyms import layers
+from tinyms import primitives as P
+from tinyms import Tensor
+from tinyms import Parameter
+
+
 from .bert_for_pre_training import clip_grad
 from .finetune_eval_model import BertCLSModel, BertNERModel, BertSquadModel
 from .utils import CrossEntropyCalculation
