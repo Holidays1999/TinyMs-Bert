@@ -18,6 +18,7 @@ Bert evaluation assessment method script.
 '''
 import math
 import numpy as np
+from tinyms.primitives import ConfusionMatrix
 from mindspore.nn import ConfusionMatrixMetric
 from .CRF import postprocess
 
