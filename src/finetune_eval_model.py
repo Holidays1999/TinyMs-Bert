@@ -17,12 +17,13 @@
 Bert finetune and evaluation model script.
 '''
 
-import mindspore.nn as nn
-from mindspore.common.initializer import TruncatedNormal
-from mindspore.ops import operations as P
+from tinyms import layers
+from tinyms import primitives as P
+from tinyms.initializers import TruncatedNormal
+
 from .bert_model import BertModel
 
-class BertCLSModel(nn.Cell):
+class BertCLSModel(layers.Layer):
     """
     This class is responsible for classification task evaluation, i.e. XNLI(num_labels=3),
     LCQMC(num_labels=2), Chnsenti(num_labels=2). The returned output represents the final
@@ -40,9 +41,9 @@ class BertCLSModel(nn.Cell):
         self.log_softmax = P.LogSoftmax(axis=-1)
         self.dtype = config.dtype
         self.num_labels = num_labels
-        self.dense_1 = nn.Dense(config.hidden_size, self.num_labels, weight_init=self.weight_init,
+        self.dense_1 = layers.Dense(config.hidden_size, self.num_labels, weight_init=self.weight_init,
                                 has_bias=True).to_float(config.compute_type)
-        self.dropout = nn.Dropout(1 - dropout_prob)
+        self.dropout = layers.Dropout(1 - dropout_prob)
         self.assessment_method = assessment_method
 
     def construct(self, input_ids, input_mask, token_type_id):
@@ -56,7 +57,7 @@ class BertCLSModel(nn.Cell):
             logits = self.log_softmax(logits)
         return logits
 
-class BertSquadModel(nn.Cell):
+class BertSquadModel(layers.Layer):
     '''
     This class is responsible for SQuAD
     '''
@@ -67,7 +68,7 @@ class BertSquadModel(nn.Cell):
             config.hidden_probs_dropout_prob = 0.0
         self.bert = BertModel(config, is_training, use_one_hot_embeddings)
         self.weight_init = TruncatedNormal(config.initializer_range)
-        self.dense1 = nn.Dense(config.hidden_size, num_labels, weight_init=self.weight_init,
+        self.dense1 = layers.Dense(config.hidden_size, num_labels, weight_init=self.weight_init,
                                has_bias=True).to_float(config.compute_type)
         self.num_labels = num_labels
         self.dtype = config.dtype
@@ -84,7 +85,7 @@ class BertSquadModel(nn.Cell):
         logits = self.log_softmax(logits)
         return logits
 
-class BertNERModel(nn.Cell):
+class BertNERModel(layers.Layer):
     """
     This class is responsible for sequence labeling task evaluation, i.e. NER(num_labels=11).
     The returned output represents the final logits as the results of log_softmax is proportional to that of softmax.
@@ -101,9 +102,9 @@ class BertNERModel(nn.Cell):
         self.log_softmax = P.LogSoftmax(axis=-1)
         self.dtype = config.dtype
         self.num_labels = num_labels
-        self.dense_1 = nn.Dense(config.hidden_size, self.num_labels, weight_init=self.weight_init,
+        self.dense_1 = layers.Dense(config.hidden_size, self.num_labels, weight_init=self.weight_init,
                                 has_bias=True).to_float(config.compute_type)
-        self.dropout = nn.Dropout(1 - dropout_prob)
+        self.dropout = layers.Dropout(1 - dropout_prob)
         self.reshape = P.Reshape()
         self.shape = (-1, config.hidden_size)
         self.use_crf = use_crf

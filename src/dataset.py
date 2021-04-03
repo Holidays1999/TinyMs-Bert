@@ -17,9 +17,12 @@ Data operations, will be used in run_pretrain.py
 """
 import os
 import mindspore.common.dtype as mstype
-import mindspore.dataset as ds
-import mindspore.dataset.transforms.c_transforms as C
 from mindspore import log as logger
+
+
+from tinyms import data as ds
+from tinyms import vision
+
 from .config import cfg
 
 
@@ -38,7 +41,7 @@ def create_bert_dataset(device_num=1, rank=0, do_shuffle="true", data_dir=None, 
                                   num_shards=device_num, shard_id=rank, shard_equal_rows=True)
     ori_dataset_size = data_set.get_dataset_size()
     print('origin dataset size: ', ori_dataset_size)
-    type_cast_op = C.TypeCast(mstype.int32)
+    type_cast_op = vision.TypeCast(mstype.int32)
     data_set = data_set.map(operations=type_cast_op, input_columns="masked_lm_ids")
     data_set = data_set.map(operations=type_cast_op, input_columns="masked_lm_positions")
     data_set = data_set.map(operations=type_cast_op, input_columns="next_sentence_labels")
@@ -55,7 +58,7 @@ def create_bert_dataset(device_num=1, rank=0, do_shuffle="true", data_dir=None, 
 def create_ner_dataset(batch_size=1, repeat_count=1, assessment_method="accuracy", data_file_path=None,
                        dataset_format="mindrecord", schema_file_path=None, do_shuffle=True, drop_remainder=True):
     """create finetune or evaluation dataset"""
-    type_cast_op = C.TypeCast(mstype.int32)
+    type_cast_op = vision.TypeCast(mstype.int32)
     if dataset_format == "mindrecord":
         dataset = ds.MindDataset([data_file_path],
                                  columns_list=["input_ids", "input_mask", "segment_ids", "label_ids"],
@@ -65,7 +68,7 @@ def create_ner_dataset(batch_size=1, repeat_count=1, assessment_method="accuracy
                                      columns_list=["input_ids", "input_mask", "segment_ids", "label_ids"],
                                      shuffle=do_shuffle)
     if assessment_method == "Spearman_correlation":
-        type_cast_op_float = C.TypeCast(mstype.float32)
+        type_cast_op_float = vision.TypeCast(mstype.float32)
         dataset = dataset.map(operations=type_cast_op_float, input_columns="label_ids")
     else:
         dataset = dataset.map(operations=type_cast_op, input_columns="label_ids")
@@ -81,12 +84,12 @@ def create_ner_dataset(batch_size=1, repeat_count=1, assessment_method="accuracy
 def create_classification_dataset(batch_size=1, repeat_count=1, assessment_method="accuracy",
                                   data_file_path=None, schema_file_path=None, do_shuffle=True):
     """create finetune or evaluation dataset"""
-    type_cast_op = C.TypeCast(mstype.int32)
+    type_cast_op = vision.TypeCast(mstype.int32)
     data_set = ds.TFRecordDataset([data_file_path], schema_file_path if schema_file_path != "" else None,
                                   columns_list=["input_ids", "input_mask", "segment_ids", "label_ids"],
                                   shuffle=do_shuffle)
     if assessment_method == "Spearman_correlation":
-        type_cast_op_float = C.TypeCast(mstype.float32)
+        type_cast_op_float = vision.TypeCast(mstype.float32)
         data_set = data_set.map(operations=type_cast_op_float, input_columns="label_ids")
     else:
         data_set = data_set.map(operations=type_cast_op, input_columns="label_ids")
@@ -107,7 +110,7 @@ def generator_squad(data_features):
 def create_squad_dataset(batch_size=1, repeat_count=1, data_file_path=None, schema_file_path=None,
                          is_training=True, do_shuffle=True):
     """create finetune or evaluation dataset"""
-    type_cast_op = C.TypeCast(mstype.int32)
+    type_cast_op = vision.TypeCast(mstype.int32)
     if is_training:
         data_set = ds.TFRecordDataset([data_file_path], schema_file_path if schema_file_path != "" else None,
                                       columns_list=["input_ids", "input_mask", "segment_ids", "start_positions",

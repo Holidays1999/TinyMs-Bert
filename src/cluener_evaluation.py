@@ -18,7 +18,7 @@
 import json
 import numpy as np
 import mindspore.common.dtype as mstype
-from mindspore.common.tensor import Tensor
+from tinyms import Tensor
 from src import tokenization
 from src.sample_process import label_generation, process_one_example_p
 from src.CRF import postprocess

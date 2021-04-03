@@ -21,16 +21,17 @@ import os
 import math
 import collections
 import numpy as np
-import mindspore.nn as nn
+
 from mindspore import log as logger
-from mindspore.ops import operations as P
-from mindspore.common.tensor import Tensor
 from mindspore.common import dtype as mstype
-from mindspore.train.callback import Callback
+from tinyms.callbacks import Callback
 from mindspore.nn.learning_rate_schedule import LearningRateSchedule, PolynomialDecayLR, WarmUpLR
 
+from tinyms import layers
+from tinyms import primitives as P
+from tinyms import Tensor
 
-class CrossEntropyCalculation(nn.Cell):
+class CrossEntropyCalculation(layers.Layer):
     """
     Cross Entropy loss
     """

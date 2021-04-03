@@ -18,13 +18,14 @@ CRF script.
 '''
 
 import numpy as np
-import mindspore.nn as nn
-from mindspore.ops import operations as P
-from mindspore.common.tensor import Tensor
-from mindspore.common.parameter import Parameter
 import mindspore.common.dtype as mstype
 
-class CRF(nn.Cell):
+from tinyms import layers
+from tinyms import primitives as P
+from tinyms import Tensor
+from tinyms import Parameter
+
+class CRF(layers.Layer):
     '''
     Conditional Random Field
     Args:

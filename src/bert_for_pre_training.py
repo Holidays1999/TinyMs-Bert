@@ -16,23 +16,27 @@
 import numpy as np
 
 import mindspore.nn as nn
-from mindspore.common.initializer import initializer, TruncatedNormal
-from mindspore.ops import operations as P
 from mindspore.ops import functional as F
-from mindspore.ops import composite as C
-from mindspore.common.tensor import Tensor
-from mindspore.common.parameter import Parameter
-from mindspore.common import dtype as mstype
 from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
-from mindspore.context import ParallelMode
 from mindspore.communication.management import get_group_size
-from mindspore import context
+
+from tinyms import context
 from .bert_model import BertModel
+import mindspore.common.dtype as mstype
+
+import tinyms as ts
+from tinyms.initializers import TruncatedNormal, initializer
+from tinyms.context import ParallelMode
+from tinyms import layers
+from tinyms import primitives as P
+from tinyms import Tensor
+from tinyms import Parameter
+
 
 GRADIENT_CLIP_TYPE = 1
 GRADIENT_CLIP_VALUE = 1.0
 
-clip_grad = C.MultitypeFuncGraph("clip_grad")
+clip_grad = P.MultitypeFuncGraph("clip_grad")
 
 
 @clip_grad.register("Number", "Number", "Tensor")
@@ -52,14 +56,14 @@ def _clip_grad(clip_type, clip_value, grad):
         return grad
     dt = F.dtype(grad)
     if clip_type == 0:
-        new_grad = C.clip_by_value(grad, F.cast(F.tuple_to_array((-clip_value,)), dt),
-                                   F.cast(F.tuple_to_array((clip_value,)), dt))
+        new_grad = P.clip_by_value(grad, P.Cast()(ts.array((-clip_value,)), dt),
+                                   P.Cast()(ts.array((clip_value,)), dt))
     else:
-        new_grad = nn.ClipByNorm()(grad, F.cast(F.tuple_to_array((clip_value,)), dt))
+        new_grad = layers.ClipByNorm()(grad, P.Cast()(ts.array((clip_value,)), dt))
     return new_grad
 
 
-class GetMaskedLMOutput(nn.Cell):
+class GetMaskedLMOutput(layers.Layer):
     """
     Get masked lm output.
 
@@ -77,17 +81,17 @@ class GetMaskedLMOutput(nn.Cell):
         self.gather = P.Gather()
 
         weight_init = TruncatedNormal(config.initializer_range)
-        self.dense = nn.Dense(self.width,
+        self.dense = layers.Dense(self.width,
                               config.hidden_size,
                               weight_init=weight_init,
                               activation=config.hidden_act).to_float(config.compute_type)
-        self.layernorm = nn.LayerNorm((config.hidden_size,)).to_float(config.compute_type)
+        self.layernorm = layers.LayerNorm((config.hidden_size,)).to_float(config.compute_type)
         self.output_bias = Parameter(
             initializer(
                 'zero',
                 config.vocab_size))
         self.matmul = P.MatMul(transpose_b=True)
-        self.log_softmax = nn.LogSoftmax(axis=-1)
+        self.log_softmax = layers.LogSoftmax(axis=-1)
         self.shape_flat_offsets = (-1, 1)
         self.last_idx = (-1,)
         self.shape_flat_sequence_tensor = (-1, self.width)
@@ -101,7 +105,7 @@ class GetMaskedLMOutput(nn.Cell):
                   output_weights,
                   positions):
         """Get output log_probs"""
-        rng = F.tuple_to_array(F.make_range(P.Shape()(input_tensor)[0]))
+        rng = ts.array(F.make_range(P.Shape()(input_tensor)[0]))
         flat_offsets = self.reshape(rng * self.seq_length_tensor, self.shape_flat_offsets)
         flat_position = self.reshape(positions + flat_offsets, self.last_idx)
         flat_sequence_tensor = self.reshape(input_tensor, self.shape_flat_sequence_tensor)
@@ -117,7 +121,7 @@ class GetMaskedLMOutput(nn.Cell):
         return log_probs
 
 
-class GetNextSentenceOutput(nn.Cell):
+class GetNextSentenceOutput(layers.Layer):
     """
     Get next sentence output.
 
@@ -132,7 +136,7 @@ class GetNextSentenceOutput(nn.Cell):
         super(GetNextSentenceOutput, self).__init__()
         self.log_softmax = P.LogSoftmax()
         weight_init = TruncatedNormal(config.initializer_range)
-        self.dense = nn.Dense(config.hidden_size, 2,
+        self.dense = layers.Dense(config.hidden_size, 2,
                               weight_init=weight_init, has_bias=True).to_float(config.compute_type)
         self.dtype = config.dtype
         self.cast = P.Cast()
@@ -144,7 +148,7 @@ class GetNextSentenceOutput(nn.Cell):
         return log_prob
 
 
-class BertPreTraining(nn.Cell):
+class BertPreTraining(layers.Layer):
     """
     Bert pretraining network.
 
@@ -174,7 +178,7 @@ class BertPreTraining(nn.Cell):
         return prediction_scores, seq_relationship_score
 
 
-class BertPretrainingLoss(nn.Cell):
+class BertPretrainingLoss(layers.Layer):
     """
     Provide bert pre-training loss.
 
@@ -207,7 +211,7 @@ class BertPretrainingLoss(nn.Cell):
 
         per_example_loss = self.neg(self.reduce_sum(prediction_scores * one_hot_labels, self.last_idx))
         numerator = self.reduce_sum(label_weights * per_example_loss, ())
-        denominator = self.reduce_sum(label_weights, ()) + self.cast(F.tuple_to_array((1e-5,)), mstype.float32)
+        denominator = self.reduce_sum(label_weights, ()) + self.cast(ts.array((1e-5,)), mstype.float32)
         masked_lm_loss = numerator / denominator
 
         # next_sentence_loss
@@ -223,7 +227,7 @@ class BertPretrainingLoss(nn.Cell):
         return total_loss
 
 
-class BertNetworkWithLoss(nn.Cell):
+class BertNetworkWithLoss(layers.Layer):
     """
     Provide bert pre-training loss through network.
 
@@ -257,7 +261,7 @@ class BertNetworkWithLoss(nn.Cell):
                                masked_lm_ids, masked_lm_weights, next_sentence_labels)
         return self.cast(total_loss, mstype.float32)
 
-
+from tinyms.model.cycle_gan import Tr
 class BertTrainOneStepCell(nn.TrainOneStepCell):
     """
     Encapsulation class of bert network training.
@@ -274,7 +278,7 @@ class BertTrainOneStepCell(nn.TrainOneStepCell):
     def __init__(self, network, optimizer, sens=1.0):
         super(BertTrainOneStepCell, self).__init__(network, optimizer, sens)
         self.cast = P.Cast()
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
 
     def set_sens(self, value):
         self.sens = value
@@ -304,15 +308,15 @@ class BertTrainOneStepCell(nn.TrainOneStepCell):
                                                  masked_lm_positions,
                                                  masked_lm_ids,
                                                  masked_lm_weights,
-                                                 self.cast(F.tuple_to_array((self.sens,)),
+                                                 self.cast(ts.array((self.sens,)),
                                                            mstype.float32))
-        grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+        grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
         grads = self.grad_reducer(grads)
         succ = self.optimizer(grads)
-        return F.depend(loss, succ)
+        return P.Depend()(loss, succ)
 
 
-grad_scale = C.MultitypeFuncGraph("grad_scale")
+grad_scale = P.MultitypeFuncGraph("grad_scale")
 reciprocal = P.Reciprocal()
 
 
@@ -321,7 +325,7 @@ def tensor_grad_scale(scale, grad):
     return grad * reciprocal(scale)
 
 
-_grad_overflow = C.MultitypeFuncGraph("_grad_overflow")
+_grad_overflow = P.MultitypeFuncGraph("_grad_overflow")
 grad_overflow = P.FloatStatus()
 
 
@@ -390,8 +394,8 @@ class BertTrainOneStepWithLossScaleCell(nn.TrainOneStepWithLossScaleCell):
                                                            mstype.float32))
         # apply grad reducer on grads
         grads = self.grad_reducer(grads)
-        grads = self.hyper_map(F.partial(grad_scale, scaling_sens * self.degree), grads)
-        grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+        grads = self.hyper_map(P.Partial()(grad_scale, scaling_sens * self.degree), grads)
+        grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
 
         cond = self.get_overflow_status(status, grads)
         overflow = cond
@@ -402,7 +406,7 @@ class BertTrainOneStepWithLossScaleCell(nn.TrainOneStepWithLossScaleCell):
         else:
             succ = self.optimizer(grads)
         ret = (loss, cond, scaling_sens)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)
 
 
 class BertTrainOneStepWithLossScaleCellForAdam(nn.TrainOneStepWithLossScaleCell):
@@ -466,50 +470,50 @@ class BertTrainOneStepWithLossScaleCellForAdam(nn.TrainOneStepWithLossScaleCell)
                                                            mstype.float32))
         # apply grad reducer on grads
         grads = self.grad_reducer(grads)
-        grads = self.hyper_map(F.partial(grad_scale, scaling_sens * self.degree), grads)
-        grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+        grads = self.hyper_map(P.Partial()(grad_scale, scaling_sens * self.degree), grads)
+        grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
         cond = self.get_overflow_status(status, grads)
         overflow = cond
         if self.loss_scaling_manager is not None:
             overflow = self.loss_scaling_manager(scaling_sens, cond)
         succ = self.optimizer(grads, overflow)
         ret = (loss, cond, scaling_sens)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)
 
 cast = P.Cast()
-add_grads = C.MultitypeFuncGraph("add_grads")
+add_grads = P.MultitypeFuncGraph("add_grads")
 
 
 @add_grads.register("Tensor", "Tensor")
 def _add_grads(accu_grad, grad):
     return accu_grad + cast(grad, mstype.float32)
 
-update_accu_grads = C.MultitypeFuncGraph("update_accu_grads")
+update_accu_grads = P.MultitypeFuncGraph("update_accu_grads")
 
 @update_accu_grads.register("Tensor", "Tensor")
 def _update_accu_grads(accu_grad, grad):
     succ = True
-    return F.depend(succ, F.assign(accu_grad, cast(grad, mstype.float32)))
+    return P.Depend()(succ, F.assign(accu_grad, cast(grad, mstype.float32)))
 
-accumulate_accu_grads = C.MultitypeFuncGraph("accumulate_accu_grads")
+accumulate_accu_grads = P.MultitypeFuncGraph("accumulate_accu_grads")
 
 @accumulate_accu_grads.register("Tensor", "Tensor")
 def _accumulate_accu_grads(accu_grad, grad):
     succ = True
-    return F.depend(succ, F.assign_add(accu_grad, cast(grad, mstype.float32)))
+    return P.Depend()(succ, F.assign_add(accu_grad, cast(grad, mstype.float32)))
 
 
 zeroslike = P.ZerosLike()
-reset_accu_grads = C.MultitypeFuncGraph("reset_accu_grads")
+reset_accu_grads = P.MultitypeFuncGraph("reset_accu_grads")
 
 
 @reset_accu_grads.register("Tensor")
 def _reset_accu_grads(accu_grad):
     succ = True
-    return F.depend(succ, F.assign(accu_grad, zeroslike(accu_grad)))
+    return P.Depend()(succ, F.assign(accu_grad, zeroslike(accu_grad)))
 
 
-class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
+class BertTrainAccumulationAllReducePostWithLossScaleCell(layers.Layer):
     """
     Encapsulation class of bert network training.
 
@@ -544,7 +548,7 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
         self.accu_overflow = Parameter(initializer(0, [1], mstype.int32))
         self.accu_loss = Parameter(initializer(0, [1], mstype.float32))
 
-        self.grad = C.GradOperation(get_by_list=True, sens_param=True)
+        self.grad = P.GradOperation(get_by_list=True, sens_param=True)
         self.reducer_flag = False
         self.parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if self.parallel_mode in [ParallelMode.DATA_PARALLEL, ParallelMode.HYBRID_PARALLEL]:
@@ -569,7 +573,7 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
         self.not_equal = P.NotEqual()
         self.select = P.Select()
         self.reshape = P.Reshape()
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
         self.loss_scale = None
         self.loss_scaling_manager = scale_update_cell
         if scale_update_cell:
@@ -599,9 +603,9 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
             scaling_sens = sens
         # alloc status and clear should be right before gradoperation
         init = self.alloc_status()
-        init = F.depend(init, loss)
+        init = P.Depend()(init, loss)
         clear_status = self.clear_status(init)
-        scaling_sens = F.depend(scaling_sens, clear_status)
+        scaling_sens = P.Depend()(scaling_sens, clear_status)
         # update accumulation parameters
         is_accu_step = self.not_equal(self.local_step, self.accumulation_steps)
         self.local_step = self.select(is_accu_step, self.local_step + self.one, self.one)
@@ -620,11 +624,11 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
                                                            mstype.float32))
 
         accu_succ = self.hyper_map(accumulate_accu_grads, self.accu_grads, grads)
-        mean_loss = F.depend(mean_loss, accu_succ)
+        mean_loss = P.Depend()(mean_loss, accu_succ)
 
-        init = F.depend(init, mean_loss)
+        init = P.Depend()(init, mean_loss)
         get_status = self.get_status(init)
-        init = F.depend(init, get_status)
+        init = P.Depend()(init, get_status)
         flag_sum = self.reduce_sum(init, (0,))
         overflow = self.less_equal(self.base, flag_sum)
         overflow = self.logical_or(self.not_equal(self.accu_overflow, self.zero), overflow)
@@ -637,16 +641,16 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
             # apply grad reducer on grads
             grads = self.grad_reducer(self.accu_grads)
             scaling = scaling_sens * self.degree * self.accumulation_steps
-            grads = self.hyper_map(F.partial(grad_scale, scaling), grads)
+            grads = self.hyper_map(P.Partial()(grad_scale, scaling), grads)
             if self.enable_global_norm:
-                grads = C.clip_by_global_norm(grads, 1.0, None)
+                grads = P.clip_by_global_norm(grads, 1.0, None)
             else:
-                grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
-            accu_overflow = F.depend(accu_overflow, grads)
+                grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+            accu_overflow = P.Depend()(accu_overflow, grads)
             accu_overflow = self.overflow_reducer(accu_overflow)
             overflow = self.less_equal(self.base, accu_overflow)
             accu_succ = self.hyper_map(reset_accu_grads, self.accu_grads)
-            overflow = F.depend(overflow, accu_succ)
+            overflow = P.Depend()(overflow, accu_succ)
             overflow = self.reshape(overflow, (()))
             if sens is None:
                 overflow = self.loss_scaling_manager(self.loss_scale, overflow)
@@ -656,10 +660,10 @@ class BertTrainAccumulationAllReducePostWithLossScaleCell(nn.Cell):
                 succ = self.optimizer(grads)
 
         ret = (mean_loss, overflow, scaling_sens)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)
 
 
-class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
+class BertTrainAccumulationAllReduceEachWithLossScaleCell(layers.Layer):
     """
     Encapsulation class of bert network training.
 
@@ -693,7 +697,7 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
         self.accu_overflow = Parameter(initializer(0, [1], mstype.int32))
         self.accu_loss = Parameter(initializer(0, [1], mstype.float32))
 
-        self.grad = C.GradOperation(get_by_list=True, sens_param=True)
+        self.grad = P.GradOperation(get_by_list=True, sens_param=True)
         self.reducer_flag = False
         self.parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if self.parallel_mode in [ParallelMode.DATA_PARALLEL, ParallelMode.HYBRID_PARALLEL]:
@@ -718,13 +722,13 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
         self.not_equal = P.NotEqual()
         self.select = P.Select()
         self.reshape = P.Reshape()
-        self.hyper_map = C.HyperMap()
+        self.hyper_map = P.HyperMap()
         self.loss_scale = None
         self.loss_scaling_manager = scale_update_cell
         if scale_update_cell:
             self.loss_scale = Parameter(Tensor(scale_update_cell.get_loss_scale(), dtype=mstype.float32))
 
-    @C.add_flags(has_effect=True)
+    @P.add_flags(has_effect=True)
     def construct(self,
                   input_ids,
                   input_mask,
@@ -771,7 +775,7 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
 
         accu_grads = self.hyper_map(add_grads, self.accu_grads, grads)
         scaling = scaling_sens * self.degree * self.accumulation_steps
-        grads = self.hyper_map(F.partial(grad_scale, scaling), accu_grads)
+        grads = self.hyper_map(P.Partial()(grad_scale, scaling), accu_grads)
         grads = self.grad_reducer(grads)
 
         self.get_status(init)
@@ -786,7 +790,7 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
         if is_accu_step:
             succ = False
             accu_succ = self.hyper_map(update_accu_grads, self.accu_grads, accu_grads)
-            succ = F.depend(succ, accu_succ)
+            succ = P.Depend()(succ, accu_succ)
         else:
             if sens is None:
                 overflow = self.loss_scaling_manager(self.loss_scale, overflow)
@@ -794,14 +798,14 @@ class BertTrainAccumulationAllReduceEachWithLossScaleCell(nn.Cell):
                 succ = False
             else:
                 if self.enable_global_norm:
-                    grads = C.clip_by_global_norm(grads, 1.0, None)
+                    grads = P.clip_by_global_norm(grads, 1.0, None)
                 else:
-                    grads = self.hyper_map(F.partial(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
+                    grads = self.hyper_map(P.Partial()(clip_grad, GRADIENT_CLIP_TYPE, GRADIENT_CLIP_VALUE), grads)
 
                 succ = self.optimizer(grads)
 
             accu_succ = self.hyper_map(reset_accu_grads, self.accu_grads)
-            succ = F.depend(succ, accu_succ)
+            succ = P.Depend()(succ, accu_succ)
 
         ret = (mean_loss, overflow, scaling_sens)
-        return F.depend(ret, succ)
+        return P.Depend()(ret, succ)

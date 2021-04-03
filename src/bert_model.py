@@ -18,12 +18,11 @@ import math
 import copy
 import numpy as np
 import mindspore.common.dtype as mstype
-import mindspore.nn as nn
-import mindspore.ops.functional as F
+
+import tinyms as ts
 from tinyms.initializers import TruncatedNormal, initializer
 from tinyms import layers
 from tinyms import primitives as P
-from mindspore.ops import composite as C
 from tinyms import Tensor
 from tinyms import Parameter
 
@@ -263,7 +262,7 @@ class RelaPosMatrixGenerator(layers.Layer):
 
     def construct(self):
         """Generates matrix of relative positions between inputs."""
-        range_vec_row_out = self.cast(F.tuple_to_array(F.make_range(self._length)), mstype.int32)
+        range_vec_row_out = self.cast(ts.array(ts.arange(self._length)), int32)
         range_vec_col_out = self.range_mat(range_vec_row_out, (self._length, -1))
         tile_row_out = self.tile(range_vec_row_out, (self._length,))
         tile_col_out = self.tile(range_vec_col_out, (1, self._length))
@@ -271,7 +270,7 @@ class RelaPosMatrixGenerator(layers.Layer):
         transpose_out = self.range_mat(tile_col_out, (self._length, self._length))
         distance_mat = self.sub(range_mat_out, transpose_out)
 
-        distance_mat_clipped = C.clip_by_value(distance_mat,
+        distance_mat_clipped = P.clip_by_value(distance_mat,
                                                self._min_relative_position,
                                                self._max_relative_position)
 
@@ -508,7 +507,7 @@ class BertAttention(layers.Layer):
 
         if self.has_attention_mask:
             attention_mask = self.expand_dims(attention_mask, 1)
-            multiply_out = self.sub(self.cast(F.tuple_to_array((1.0,)), self.get_dtype(attention_scores)),
+            multiply_out = self.sub(self.cast(ts.array((1.0,)), self.get_dtype(attention_scores)),
                                     self.cast(attention_mask, self.get_dtype(attention_scores)))
 
             adder = self.multiply(multiply_out, self.multiply_data)
@@ -715,7 +714,7 @@ class BertTransformer(layers.Layer):
         super(BertTransformer, self).__init__()
         self.return_all_encoders = return_all_encoders
 
-        layers = []
+        slayers = []
         for _ in range(num_hidden_layers):
             layer = BertEncoderCell(hidden_size=hidden_size,
                                     seq_length=seq_length,
@@ -728,9 +727,9 @@ class BertTransformer(layers.Layer):
                                     use_relative_positions=use_relative_positions,
                                     hidden_act=hidden_act,
                                     compute_type=compute_type)
-            layers.append(layer)
+            slayers.append(layer)
 
-        self.layers = layers.LayerList(layers)
+        self.layers = layers.LayerList(slayers)
 
         self.reshape = P.Reshape()
         self.shape = (-1, hidden_size)
@@ -874,3 +873,6 @@ class BertModel(layers.Layer):
         pooled_output = self.cast(pooled_output, self.dtype)
 
         return sequence_output, pooled_output, embedding_tables
+
+
+# model = BertModel(BertConfig(), is_training=False)

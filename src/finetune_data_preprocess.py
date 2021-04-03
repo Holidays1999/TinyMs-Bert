@@ -23,11 +23,11 @@ import numpy as np
 from lxml import etree
 
 import mindspore.common.dtype as mstype
-import mindspore.dataset as ds
 import mindspore.dataset.text as text
-import mindspore.dataset.transforms.c_transforms as ops
-from utils import convert_labels_to_index
 
+from tinyms import data as ds
+from tinyms import vision
+from utils import convert_labels_to_index
 
 def process_tnews_clue_dataset(data_dir, label_list, bert_vocab_path, data_usage='train', shuffle_dataset=False,
                                max_seq_len=128, batch_size=64, drop_remainder=True):
@@ -45,9 +45,9 @@ def process_tnews_clue_dataset(data_dir, label_list, bert_vocab_path, data_usage
                                  usage=data_usage, shuffle=shuffle_dataset)
     ### Processing label
     if data_usage == 'test':
-        dataset = dataset.map(operations=ops.Duplicate(), input_columns=["id"], output_columns=["id", "label_id"],
+        dataset = dataset.map(operations=vision.Duplicate(), input_columns=["id"], output_columns=["id", "label_id"],
                               column_order=["id", "label_id", "sentence"])
-        dataset = dataset.map(operations=ops.Fill(0), input_columns=["label_id"])
+        dataset = dataset.map(operations=vision.Fill(0), input_columns=["label_id"])
     else:
         label_vocab = text.Vocab.from_list(label_list)
         label_lookup = text.Lookup(label_vocab)
@@ -57,19 +57,19 @@ def process_tnews_clue_dataset(data_dir, label_list, bert_vocab_path, data_usage
     tokenizer = text.BertTokenizer(vocab, lower_case=True)
     lookup = text.Lookup(vocab, unknown_token='[UNK]')
     dataset = dataset.map(operations=tokenizer, input_columns=["sentence"])
-    dataset = dataset.map(operations=ops.Slice(slice(0, max_seq_len)), input_columns=["sentence"])
-    dataset = dataset.map(operations=ops.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
+    dataset = dataset.map(operations=vision.Slice(slice(0, max_seq_len)), input_columns=["sentence"])
+    dataset = dataset.map(operations=vision.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
                                                      append=np.array(["[SEP]"], dtype='S')), input_columns=["sentence"])
     dataset = dataset.map(operations=lookup, input_columns=["sentence"], output_columns=["text_ids"])
-    dataset = dataset.map(operations=ops.PadEnd([max_seq_len], 0), input_columns=["text_ids"])
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["text_ids"],
+    dataset = dataset.map(operations=vision.PadEnd([max_seq_len], 0), input_columns=["text_ids"])
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["text_ids"],
                           output_columns=["text_ids", "mask_ids"],
                           column_order=["text_ids", "mask_ids", "label_id"])
-    dataset = dataset.map(operations=ops.Mask(ops.Relational.NE, 0, mstype.int32), input_columns=["mask_ids"])
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["text_ids"],
+    dataset = dataset.map(operations=vision.Mask(vision.Relational.NE, 0, mstype.int32), input_columns=["mask_ids"])
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["text_ids"],
                           output_columns=["text_ids", "segment_ids"],
                           column_order=["text_ids", "mask_ids", "segment_ids", "label_id"])
-    dataset = dataset.map(operations=ops.Fill(0), input_columns=["segment_ids"])
+    dataset = dataset.map(operations=vision.Fill(0), input_columns=["segment_ids"])
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     return dataset
 
@@ -90,9 +90,9 @@ def process_cmnli_clue_dataset(data_dir, label_list, bert_vocab_path, data_usage
                                  usage=data_usage, shuffle=shuffle_dataset)
     ### Processing label
     if data_usage == 'test':
-        dataset = dataset.map(operations=ops.Duplicate(), input_columns=["id"], output_columns=["id", "label_id"],
+        dataset = dataset.map(operations=vision.Duplicate(), input_columns=["id"], output_columns=["id", "label_id"],
                               column_order=["id", "label_id", "sentence1", "sentence2"])
-        dataset = dataset.map(operations=ops.Fill(0), input_columns=["label_id"])
+        dataset = dataset.map(operations=vision.Fill(0), input_columns=["label_id"])
     else:
         label_vocab = text.Vocab.from_list(label_list)
         label_lookup = text.Lookup(label_vocab)
@@ -107,35 +107,35 @@ def process_cmnli_clue_dataset(data_dir, label_list, bert_vocab_path, data_usage
     dataset = dataset.map(operations=text.TruncateSequencePair(max_seq_len - 3),
                           input_columns=["sentence1", "sentence2"])
     ### Adding special tokens
-    dataset = dataset.map(operations=ops.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
+    dataset = dataset.map(operations=vision.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
                                                      append=np.array(["[SEP]"], dtype='S')),
                           input_columns=["sentence1"])
-    dataset = dataset.map(operations=ops.Concatenate(append=np.array(["[SEP]"], dtype='S')),
+    dataset = dataset.map(operations=vision.Concatenate(append=np.array(["[SEP]"], dtype='S')),
                           input_columns=["sentence2"])
     ### Generating segment_ids
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["sentence1"],
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["sentence1"],
                           output_columns=["sentence1", "type_sentence1"],
                           column_order=["sentence1", "type_sentence1", "sentence2", "label_id"])
-    dataset = dataset.map(operations=ops.Duplicate(),
+    dataset = dataset.map(operations=vision.Duplicate(),
                           input_columns=["sentence2"], output_columns=["sentence2", "type_sentence2"],
                           column_order=["sentence1", "type_sentence1", "sentence2", "type_sentence2", "label_id"])
-    dataset = dataset.map(operations=[lookup, ops.Fill(0)], input_columns=["type_sentence1"])
-    dataset = dataset.map(operations=[lookup, ops.Fill(1)], input_columns=["type_sentence2"])
-    dataset = dataset.map(operations=ops.Concatenate(),
+    dataset = dataset.map(operations=[lookup, vision.Fill(0)], input_columns=["type_sentence1"])
+    dataset = dataset.map(operations=[lookup, vision.Fill(1)], input_columns=["type_sentence2"])
+    dataset = dataset.map(operations=vision.Concatenate(),
                           input_columns=["type_sentence1", "type_sentence2"], output_columns=["segment_ids"],
                           column_order=["sentence1", "sentence2", "segment_ids", "label_id"])
-    dataset = dataset.map(operations=ops.PadEnd([max_seq_len], 0), input_columns=["segment_ids"])
+    dataset = dataset.map(operations=vision.PadEnd([max_seq_len], 0), input_columns=["segment_ids"])
     ### Generating text_ids
-    dataset = dataset.map(operations=ops.Concatenate(),
+    dataset = dataset.map(operations=vision.Concatenate(),
                           input_columns=["sentence1", "sentence2"], output_columns=["text_ids"],
                           column_order=["text_ids", "segment_ids", "label_id"])
     dataset = dataset.map(operations=lookup, input_columns=["text_ids"])
-    dataset = dataset.map(operations=ops.PadEnd([max_seq_len], 0), input_columns=["text_ids"])
+    dataset = dataset.map(operations=vision.PadEnd([max_seq_len], 0), input_columns=["text_ids"])
     ### Generating mask_ids
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["text_ids"],
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["text_ids"],
                           output_columns=["text_ids", "mask_ids"],
                           column_order=["text_ids", "mask_ids", "segment_ids", "label_id"])
-    dataset = dataset.map(operations=ops.Mask(ops.Relational.NE, 0, mstype.int32), input_columns=["mask_ids"])
+    dataset = dataset.map(operations=vision.Mask(vision.Relational.NE, 0, mstype.int32), input_columns=["mask_ids"])
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     return dataset
 
@@ -199,28 +199,28 @@ def process_ner_msra_dataset(data_dir, label_list, bert_vocab_path, max_seq_len=
     label_vocab = text.Vocab.from_list(label_list)
     label_lookup = text.Lookup(label_vocab)
     dataset = dataset.map(operations=label_lookup, input_columns="label", output_columns="label_ids")
-    dataset = dataset.map(operations=ops.Concatenate(prepend=np.array([0], dtype='i')),
+    dataset = dataset.map(operations=vision.Concatenate(prepend=np.array([0], dtype='i')),
                           input_columns=["label_ids"])
-    dataset = dataset.map(operations=ops.Slice(slice(0, max_seq_len)), input_columns=["label_ids"])
-    dataset = dataset.map(operations=ops.PadEnd([max_seq_len], 0), input_columns=["label_ids"])
+    dataset = dataset.map(operations=vision.Slice(slice(0, max_seq_len)), input_columns=["label_ids"])
+    dataset = dataset.map(operations=vision.PadEnd([max_seq_len], 0), input_columns=["label_ids"])
     ### Processing sentence
     vocab = text.Vocab.from_file(bert_vocab_path)
     lookup = text.Lookup(vocab, unknown_token='[UNK]')
     unicode_char_tokenizer = text.UnicodeCharTokenizer()
     dataset = dataset.map(operations=unicode_char_tokenizer, input_columns=["text"], output_columns=["sentence"])
-    dataset = dataset.map(operations=ops.Slice(slice(0, max_seq_len-2)), input_columns=["sentence"])
-    dataset = dataset.map(operations=ops.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
+    dataset = dataset.map(operations=vision.Slice(slice(0, max_seq_len-2)), input_columns=["sentence"])
+    dataset = dataset.map(operations=vision.Concatenate(prepend=np.array(["[CLS]"], dtype='S'),
                                                      append=np.array(["[SEP]"], dtype='S')), input_columns=["sentence"])
     dataset = dataset.map(operations=lookup, input_columns=["sentence"], output_columns=["input_ids"])
-    dataset = dataset.map(operations=ops.PadEnd([max_seq_len], 0), input_columns=["input_ids"])
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["input_ids"],
+    dataset = dataset.map(operations=vision.PadEnd([max_seq_len], 0), input_columns=["input_ids"])
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["input_ids"],
                           output_columns=["input_ids", "input_mask"],
                           column_order=["input_ids", "input_mask", "label_ids"])
-    dataset = dataset.map(operations=ops.Mask(ops.Relational.NE, 0, mstype.int32), input_columns=["input_mask"])
-    dataset = dataset.map(operations=ops.Duplicate(), input_columns=["input_ids"],
+    dataset = dataset.map(operations=vision.Mask(vision.Relational.NE, 0, mstype.int32), input_columns=["input_mask"])
+    dataset = dataset.map(operations=vision.Duplicate(), input_columns=["input_ids"],
                           output_columns=["input_ids", "segment_ids"],
                           column_order=["input_ids", "input_mask", "segment_ids", "label_ids"])
-    dataset = dataset.map(operations=ops.Fill(0), input_columns=["segment_ids"])
+    dataset = dataset.map(operations=vision.Fill(0), input_columns=["segment_ids"])
     return dataset
 
 
